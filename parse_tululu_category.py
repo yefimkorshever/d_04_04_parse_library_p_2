@@ -19,15 +19,15 @@ def check_for_redirect(response):
 def parse_book_card(response):
 
     soup = BeautifulSoup(response.text, 'lxml')
-    div_content = soup.find('div', id='content')
-    title_text = div_content.find('h1').text
+    div_content = soup.select_one('div#content')
+    title_text = div_content.select_one('h1').text
     title, author = title_text.split(sep='::')
-    img_src = div_content.find('img')['src']
+    img_src = div_content.select_one('img')['src']
 
-    comments_tags = soup.find_all('div', class_='texts')
-    comments = [comment_tag.find('span').text for comment_tag in comments_tags]
+    span_tags = soup.select('.texts span')
+    comments = [span_tag.text for span_tag in span_tags]
 
-    genres_links = soup.find('span', class_='d_book').find_all('a')
+    genres_links = soup.select_one('span.d_book').select('a')
     genres = [genre_link.text for genre_link in genres_links]
 
     return {
@@ -95,9 +95,9 @@ page {page_id}: {connect_fail}')
             continue
 
         soup = BeautifulSoup(page_response.text, 'lxml')
-        tables_tags = soup.find('div', id='content').find_all('table')
+        tables_tags = soup.select('div#content table')
         for table_tag in tables_tags:
-            relative_book_url = table_tag.find('a')['href']
+            relative_book_url = table_tag.select_one('a')['href']
             absolute_book_url = urljoin(page_response.url, relative_book_url)
             book_id = relative_book_url.strip('/b')
             books_collection.append((absolute_book_url, book_id))
@@ -107,7 +107,7 @@ page {page_id}: {connect_fail}')
 
 def main():
 
-    books_collection, errors_texts = get_books_description(1, 4)
+    books_collection, errors_texts = get_books_description(1, 1)
     books_catalog = []
 
     image_folder = 'images'
