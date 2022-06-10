@@ -104,15 +104,15 @@ def parse_books_page(books_collection, page_response):
         books_collection.append((absolute_book_url, book_id))
 
 
-def get_books_collection(current_page, end_page):
+def get_books_collection(start_page, end_page):
     end_page_search = end_page == 0
     if end_page_search:
-        end_page = current_page
+        end_page = sys.maxsize
 
     parsed_urls = []
     books_collection = []
-    while current_page <= end_page:
-        page_url = f'https://tululu.org/l55/{current_page}/'
+    for page_id in range(start_page, end_page):
+        page_url = f'https://tululu.org/l55/{page_id}/'
 
         try:
             page_response = requests.get(page_url)
@@ -147,10 +147,6 @@ def get_books_collection(current_page, end_page):
 
         parse_books_page(books_collection, page_response)
         parsed_urls.append(page_response.url)
-
-        current_page += 1
-        if end_page_search:
-            end_page = current_page
 
     if parsed_urls:
         print(f'parsed pages: {parsed_urls[0]} - {parsed_urls[-1]}')
