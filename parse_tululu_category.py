@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import sys
@@ -11,9 +12,28 @@ from pathvalidate import sanitize_filename
 from tqdm import tqdm
 
 
+def create_arg_parser():
+    description = 'The program parses tululu.org library'
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('--start_page',
+                        help='start page (obligatory)',
+                        required=True,
+                        type=int,
+                        )
+
+    parser.add_argument('--end_page',
+                        help='end page (if omitted loading up to'
+                        ' the last page)',
+                        default=0,
+                        type=int,
+                        )
+    return parser
+
+
 def check_for_redirect(response):
     if response.history:
-        raise requests.HTTPError('redirected')
+        raise requests.HTTPError('redirection detected')
 
 
 def parse_book_card(response):
@@ -74,47 +94,87 @@ def save_books_catalog(books_catalog):
         registry_file.write(books_dump)
 
 
-def get_books_description(start_page, end_page):
-    errors_texts = []
+def parse_books_page(books_collection, page_response):
+    soup = BeautifulSoup(page_response.text, 'lxml')
+    tables_tags = soup.select('div#content table')
+    for table_tag in tables_tags:
+        relative_book_url = table_tag.select_one('a')['href']
+        absolute_book_url = urljoin(page_response.url, relative_book_url)
+        book_id = relative_book_url.strip('/b')
+        books_collection.append((absolute_book_url, book_id))
+
+
+def get_books_collection(current_page, end_page):
+    end_page_search = end_page == 0
+    if end_page_search:
+        end_page = current_page
+
+    parsed_urls = []
     books_collection = []
-    for page_id in range(start_page, end_page + 1):
-        page_url = f'https://tululu.org/l55/{page_id}/'
+    while current_page <= end_page:
+        page_url = f'https://tululu.org/l55/{current_page}/'
+
         try:
             page_response = requests.get(page_url)
             page_response.raise_for_status()
             check_for_redirect(page_response)
         except requests.exceptions.HTTPError as http_fail:
-            errors_texts.append(f'HTTP error occurred while requesting \
-page {page_id}: {http_fail}')
-            continue
+            if (
+                end_page_search and
+                http_fail.args and
+                http_fail.args[0] == 'redirection detected'
+            ):
+                break
+
+            print(
+                f'HTTP error occurred while downloading {page_url}:',
+                http_fail,
+                file=sys.stderr
+            )
+            if end_page_search:
+                break
 
         except requests.exceptions.ConnectionError as connect_fail:
-            errors_texts.append(f'Connection error occurred while requesting \
-page {page_id}: {connect_fail}')
+            print(
+                f'Connection error occurred while downloading{page_url}:',
+                connect_fail,
+                file=sys.stderr
+            )
+            if end_page_search:
+                break
             sleep(2)
             continue
 
-        soup = BeautifulSoup(page_response.text, 'lxml')
-        tables_tags = soup.select('div#content table')
-        for table_tag in tables_tags:
-            relative_book_url = table_tag.select_one('a')['href']
-            absolute_book_url = urljoin(page_response.url, relative_book_url)
-            book_id = relative_book_url.strip('/b')
-            books_collection.append((absolute_book_url, book_id))
+        parse_books_page(books_collection, page_response)
+        parsed_urls.append(page_response.url)
 
-    return books_collection, errors_texts
+        current_page += 1
+        if end_page_search:
+            end_page = current_page
+
+    if parsed_urls:
+        print(f'parsed pages: {parsed_urls[0]} - {parsed_urls[-1]}')
+    else:
+        print('no pages to parse')
+    return books_collection
 
 
 def main():
 
-    books_collection, errors_texts = get_books_description(1, 1)
+    arg_parser = create_arg_parser()
+    namespace = arg_parser.parse_args()
+    books_collection = get_books_collection(
+        namespace.start_page,
+        namespace.end_page
+    )
+    errors_texts = []
     books_catalog = []
 
     image_folder = 'images'
     txt_folder = 'books'
     Path(f'./{image_folder}').mkdir(exist_ok=True)
     Path(f'./{txt_folder}').mkdir(exist_ok=True)
-
+    print('downloading books...')
     for url, book_id in tqdm(books_collection):
         try:
             response = requests.get(url)
@@ -132,14 +192,18 @@ def main():
             )
             download_image(book_card, image_folder)
         except requests.exceptions.HTTPError as http_fail:
-            errors_texts.append(f'HTTP error occurred while downloading\
-book {url}: {http_fail}')
+            errors_texts.append(
+                f'HTTP error occurred while downloading '
+                f'book {url}: {http_fail}'
+            )
 
             continue
 
         except requests.exceptions.ConnectionError as connect_fail:
-            errors_texts.append(f'Connection error occurred while downloading\
-book {url}: {connect_fail}')
+            errors_texts.append(
+                'Connection error occurred while downloading'
+                f'book {url}: {connect_fail}'
+            )
             sleep(2)
             continue
 

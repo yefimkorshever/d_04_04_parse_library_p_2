@@ -1,4 +1,5 @@
 books/
 images/
 tmp/
+.vscode/
 books_catalog.json
