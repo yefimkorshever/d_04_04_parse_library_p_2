@@ -17,17 +17,44 @@ def create_arg_parser():
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('--start_page',
-                        help='start page (obligatory)',
+                        metavar='[start page]',
+                        help='page to start with (obligatory)',
                         required=True,
                         type=int,
                         )
 
     parser.add_argument('--end_page',
-                        help='end page (if omitted loading up to'
+                        metavar='[end page]',
+                        help='page to end with (if omitted loading up to'
                         ' the last page)',
                         default=0,
                         type=int,
                         )
+
+    parser.add_argument('--dest_folder',
+                        metavar='[destination folder]',
+                        help='destination folder for parsing results'
+                        ' (root project folder by default)',
+                        default='.',
+                        )
+
+    parser.add_argument('--json_path',
+                        metavar='[json path]',
+                        help='path to json books catalog file'
+                        ' (books_catalog.json by default)',
+                        default='./books_catalog.json',
+                        )
+
+    parser.add_argument('--skip_imgs',
+                        help='do not download images',
+                        action="store_true",
+                        )
+
+    parser.add_argument('--skip_txt',
+                        help='do not download texts',
+                        action="store_true",
+                        )
+
     return parser
 
 
@@ -88,9 +115,10 @@ def download_txt(url, payload, book_card, folder):
     book_card['book_path'] = file_path
 
 
-def save_books_catalog(books_catalog):
+def save_books_catalog(books_catalog, json_path):
+    json_path = os.path.normpath(json_path)
     books_dump = json.dumps(books_catalog, ensure_ascii=False, indent="\t")
-    with open('books_catalog.json', 'w', encoding="UTF-8") as registry_file:
+    with open(json_path, 'w', encoding="UTF-8") as registry_file:
         registry_file.write(books_dump)
 
 
@@ -159,6 +187,7 @@ def main():
 
     arg_parser = create_arg_parser()
     namespace = arg_parser.parse_args()
+
     books_collection = get_books_collection(
         namespace.start_page,
         namespace.end_page
@@ -166,10 +195,11 @@ def main():
     errors_texts = []
     books_catalog = []
 
-    image_folder = 'images'
-    txt_folder = 'books'
-    Path(f'./{image_folder}').mkdir(exist_ok=True)
-    Path(f'./{txt_folder}').mkdir(exist_ok=True)
+    dest_folder = os.path.normpath(namespace.dest_folder)
+    image_folder = os.path.join(dest_folder, 'images')
+    txt_folder = os.path.join(dest_folder, 'books')
+    Path(image_folder).mkdir(exist_ok=True)
+    Path(txt_folder).mkdir(exist_ok=True)
     print('downloading books...')
     for url, book_id in tqdm(books_collection):
         try:
@@ -179,33 +209,36 @@ def main():
 
             book_card = parse_book_card(response)
 
-            payload = {'id': book_id}
-            download_txt(
-                'https://tululu.org/txt.php',
-                payload,
-                book_card,
-                txt_folder
-            )
-            download_image(book_card, image_folder)
-        except requests.exceptions.HTTPError as http_fail:
+            if not namespace.skip_txt:
+                payload = {'id': book_id}
+                download_txt(
+                    'https://tululu.org/txt.php',
+                    payload,
+                    book_card,
+                    txt_folder
+                )
+
+            if not namespace.skip_imgs:
+                download_image(book_card, image_folder)
+        except requests.exceptions.HTTPError as fail:
             errors_texts.append(
                 f'HTTP error occurred while downloading '
-                f'book {url}: {http_fail}'
+                f'book {url}: {fail}'
             )
 
             continue
 
-        except requests.exceptions.ConnectionError as connect_fail:
+        except requests.exceptions.ConnectionError as fail:
             errors_texts.append(
                 'Connection error occurred while downloading'
-                f'book {url}: {connect_fail}'
+                f'book {url}: {fail}'
             )
             sleep(2)
             continue
 
         books_catalog.append(book_card)
 
-    save_books_catalog(books_catalog)
+    save_books_catalog(books_catalog, namespace.json_path)
 
     for error_text in errors_texts:
         print(error_text,  file=sys.stderr)
