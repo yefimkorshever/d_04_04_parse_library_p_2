@@ -30,9 +30,8 @@ For example, to download books with IDs from 21 to 23, run:
 python parse_tululu_category.py --start_page 21 --end_page 24
 ```
 
-- You can input destination folder and JSON books catalog file paths, skip downloading images or texts
-
-To find out more, run built-in help:
+- You can input destination folder and JSON books catalog file paths,
+skip downloading images or texts; to find out more, run:
 
 ```bash
 python parse_tululu_category.py -h
