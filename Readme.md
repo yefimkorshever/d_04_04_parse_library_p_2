@@ -20,20 +20,22 @@ pip install -r requirements.txt
 - Run:
 
 ```bash
-python parse.py
+python parse_tululu_category.py
 ```
 
 - It's possible to input start and end book ID.
-For example, to download books with IDs from 21 to 30, run:
+For example, to download books with IDs from 21 to 23, run:
 
 ```bash
-python parse.py 21 30
+python parse_tululu_category.py --start_page 21 --end_page 24
 ```
 
-To find out more, run:
+- You can input destination folder and JSON books catalog file paths, skip downloading images or texts
+
+To find out more, run built-in help:
 
 ```bash
-python parse.py -h
+python parse_tululu_category.py -h
 ```
 
 ## Project purposes

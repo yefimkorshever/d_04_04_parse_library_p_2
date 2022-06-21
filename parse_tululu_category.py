@@ -18,8 +18,8 @@ def create_arg_parser():
 
     parser.add_argument('--start_page',
                         metavar='[start page]',
-                        help='page to start with (obligatory)',
-                        required=True,
+                        help='page to start with (default: 1)',
+                        default=1,
                         type=int,
                         )
 
@@ -42,7 +42,6 @@ def create_arg_parser():
                         metavar='[json path]',
                         help='path to json books catalog file'
                         ' (books_catalog.json by default)',
-                        default='./books_catalog.json',
                         )
 
     parser.add_argument('--skip_imgs',
@@ -115,10 +114,16 @@ def download_txt(url, payload, book_card, folder):
     book_card['book_path'] = file_path
 
 
-def save_books_catalog(books_catalog, json_path):
-    json_path = os.path.normpath(json_path)
+def save_books_catalog(books_catalog, json_path, dest_folder):
+    if json_path:
+        file_path = os.path.normpath(json_path)
+    elif dest_folder != '.':
+        file_path = os.path.join(dest_folder, 'books_catalog.json')
+    else:
+        file_path = 'books_catalog.json'
+
     books_dump = json.dumps(books_catalog, ensure_ascii=False, indent="\t")
-    with open(json_path, 'w', encoding="UTF-8") as registry_file:
+    with open(file_path, 'w', encoding="UTF-8") as registry_file:
         registry_file.write(books_dump)
 
 
@@ -137,6 +142,7 @@ def get_books_collection(start_page, end_page):
     if end_page_search:
         end_page = sys.maxsize
 
+    print(f'seek pages {start_page} - {end_page - 1}...')
     parsed_urls = []
     books_collection = []
     for page_id in range(start_page, end_page):
@@ -238,7 +244,7 @@ def main():
 
         books_catalog.append(book_card)
 
-    save_books_catalog(books_catalog, namespace.json_path)
+    save_books_catalog(books_catalog, namespace.json_path, dest_folder)
 
     for error_text in errors_texts:
         print(error_text,  file=sys.stderr)
