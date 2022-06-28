@@ -27,7 +27,7 @@ def create_arg_parser():
                         metavar='[end page]',
                         help='page to end with (if omitted loading up to'
                         ' the last page)',
-                        default=0,
+                        default=get_end_page_id(),
                         type=int,
                         )
 
@@ -55,6 +55,14 @@ def create_arg_parser():
                         )
 
     return parser
+
+
+def get_end_page_id():
+    response = requests.get('https://tululu.org/l55/1/')
+    response.raise_for_status()
+    check_for_redirect(response)
+    soup = BeautifulSoup(response.text, 'lxml')
+    return int(soup.select('.npage')[-1].text) + 1
 
 
 def check_for_redirect(response):
@@ -138,47 +146,15 @@ def parse_books_page(books_collection, page_response):
 
 
 def get_books_collection(start_page, end_page):
-    end_page_search = end_page == 0
-    if end_page_search:
-        end_page = sys.maxsize
-
     print(f'seek pages {start_page} - {end_page - 1}...')
     parsed_urls = []
     books_collection = []
     for page_id in range(start_page, end_page):
         page_url = f'https://tululu.org/l55/{page_id}/'
 
-        try:
-            page_response = requests.get(page_url)
-            page_response.raise_for_status()
-            check_for_redirect(page_response)
-        except requests.exceptions.HTTPError as http_fail:
-            if (
-                end_page_search and
-                http_fail.args and
-                http_fail.args[0] == 'redirection detected'
-            ):
-                break
-
-            print(
-                f'HTTP error occurred while downloading {page_url}:',
-                http_fail,
-                file=sys.stderr
-            )
-            if end_page_search:
-                break
-
-        except requests.exceptions.ConnectionError as connect_fail:
-            print(
-                f'Connection error occurred while downloading{page_url}:',
-                connect_fail,
-                file=sys.stderr
-            )
-            if end_page_search:
-                break
-            sleep(2)
-            continue
-
+        page_response = requests.get(page_url)
+        page_response.raise_for_status()
+        check_for_redirect(page_response)
         parse_books_page(books_collection, page_response)
         parsed_urls.append(page_response.url)
 
@@ -190,7 +166,6 @@ def get_books_collection(start_page, end_page):
 
 
 def main():
-
     arg_parser = create_arg_parser()
     namespace = arg_parser.parse_args()
 
