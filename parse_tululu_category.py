@@ -146,16 +146,13 @@ def parse_books_page(books_collection, page_response):
 
 
 def get_books_collection(start_page, end_page):
-    parsed_urls = []
     books_collection = []
     for page_id in range(start_page, end_page):
         page_url = f'https://tululu.org/l55/{page_id}/'
-
         page_response = requests.get(page_url)
         page_response.raise_for_status()
         check_for_redirect(page_response)
         parse_books_page(books_collection, page_response)
-        parsed_urls.append(page_response.url)
 
     return books_collection
 
