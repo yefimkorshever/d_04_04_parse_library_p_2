@@ -146,7 +146,6 @@ def parse_books_page(books_collection, page_response):
 
 
 def get_books_collection(start_page, end_page):
-    print(f'seek pages {start_page} - {end_page - 1}...')
     parsed_urls = []
     books_collection = []
     for page_id in range(start_page, end_page):
@@ -158,10 +157,6 @@ def get_books_collection(start_page, end_page):
         parse_books_page(books_collection, page_response)
         parsed_urls.append(page_response.url)
 
-    if parsed_urls:
-        print(f'parsed pages: {parsed_urls[0]} - {parsed_urls[-1]}')
-    else:
-        print('no pages to parse')
     return books_collection
 
 
@@ -181,7 +176,6 @@ def main():
     txt_folder = os.path.join(dest_folder, 'books')
     Path(image_folder).mkdir(exist_ok=True)
     Path(txt_folder).mkdir(exist_ok=True)
-    print('downloading books...')
     for url, book_id in tqdm(books_collection):
         try:
             response = requests.get(url)
