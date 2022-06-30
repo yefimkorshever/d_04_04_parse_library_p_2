@@ -107,7 +107,8 @@ def download_image(url, folder):
     return file_path
 
 
-def download_txt(url, payload, filename, folder):
+def download_txt(url, book_id, filename, folder):
+    payload = {'id': book_id}
     response = requests.get(url, params=payload)
     response.raise_for_status()
     check_for_redirect(response)
@@ -177,10 +178,9 @@ def main():
             book_card = parse_book_card(response)
 
             if not namespace.skip_txt:
-                payload = {'id': book_id}
                 book_card['book_path'] = download_txt(
                     'https://tululu.org/txt.php',
-                    payload,
+                    book_id,
                     book_card['title'],
                     txt_folder
                 )
