@@ -76,7 +76,7 @@ def parse_book_card(response):
     div_content = soup.select_one('div#content')
     title_text = div_content.select_one('h1').text
     title, author = title_text.split(sep='::')
-    img_src = div_content.select_one('img')['src']
+    img_url = div_content.select_one('img')['src']
 
     span_tags = soup.select('.texts span')
     comments = [span_tag.text for span_tag in span_tags]
@@ -87,14 +87,13 @@ def parse_book_card(response):
     return {
         'title': title.strip(),
         'author': author.strip(),
-        'img_src': urljoin(response.url, img_src),
+        'img_url': urljoin(response.url, img_url),
         'comments': comments,
         'genres': genres,
     }
 
 
-def download_image(book_card, folder):
-    url = book_card['img_src']
+def download_image(url, folder):
     response = requests.get(url)
     response.raise_for_status()
     check_for_redirect(response)
@@ -105,11 +104,10 @@ def download_image(book_card, folder):
     with open(file_path, 'wb') as file:
         file.write(response.content)
 
-    book_card['img_src'] = file_path
+    return file_path
 
 
-def download_txt(url, payload, book_card, folder):
-    filename = book_card['title']
+def download_txt(url, payload, filename, folder):
     response = requests.get(url, params=payload)
     response.raise_for_status()
     check_for_redirect(response)
@@ -119,7 +117,7 @@ def download_txt(url, payload, book_card, folder):
     with open(file_path, 'w', encoding='utf-8') as file:
         file.write(response.text)
 
-    book_card['book_path'] = file_path
+    return file_path
 
 
 def save_books_catalog(books_catalog, json_path, dest_folder):
@@ -135,16 +133,6 @@ def save_books_catalog(books_catalog, json_path, dest_folder):
         registry_file.write(books_dump)
 
 
-def parse_books_page(books_collection, page_response):
-    soup = BeautifulSoup(page_response.text, 'lxml')
-    tables_tags = soup.select('div#content table')
-    for table_tag in tables_tags:
-        relative_book_url = table_tag.select_one('a')['href']
-        absolute_book_url = urljoin(page_response.url, relative_book_url)
-        book_id = relative_book_url.strip('/b')
-        books_collection.append((absolute_book_url, book_id))
-
-
 def get_books_collection(start_page, end_page):
     books_collection = []
     for page_id in range(start_page, end_page):
@@ -152,7 +140,14 @@ def get_books_collection(start_page, end_page):
         page_response = requests.get(page_url)
         page_response.raise_for_status()
         check_for_redirect(page_response)
-        parse_books_page(books_collection, page_response)
+
+        soup = BeautifulSoup(page_response.text, 'lxml')
+        tables_tags = soup.select('div#content table')
+        for table_tag in tables_tags:
+            relative_book_url = table_tag.select_one('a')['href']
+            absolute_book_url = urljoin(page_response.url, relative_book_url)
+            book_id = relative_book_url.strip('/b')
+            books_collection.append((absolute_book_url, book_id))
 
     return books_collection
 
@@ -183,15 +178,18 @@ def main():
 
             if not namespace.skip_txt:
                 payload = {'id': book_id}
-                download_txt(
+                book_card['book_path'] = download_txt(
                     'https://tululu.org/txt.php',
                     payload,
-                    book_card,
+                    book_card['title'],
                     txt_folder
                 )
 
             if not namespace.skip_imgs:
-                download_image(book_card, image_folder)
+                book_card['img_src'] = download_image(
+                    book_card['img_url'],
+                    image_folder
+                )
         except requests.exceptions.HTTPError as fail:
             errors_texts.append(
                 f'HTTP error occurred while downloading '
