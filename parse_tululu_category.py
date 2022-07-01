@@ -62,7 +62,7 @@ def get_end_page_id():
     response.raise_for_status()
     check_for_redirect(response)
     soup = BeautifulSoup(response.text, 'lxml')
-    return int(soup.select('.npage')[-1].text) + 1
+    return int(soup.select_one('.npage:last-of-type').text) + 1
 
 
 def check_for_redirect(response):
